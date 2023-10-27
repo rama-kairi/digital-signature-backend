@@ -135,17 +135,11 @@ export class DocumentService {
 
     const pdfBytes = await pdfDoc.save();
     writeFileSync(
-      join(
-        'src/uploads/' +
-          firstName +
-          lastName +
-          email.replace('@', '') +
-          '-merged.pdf',
-      ),
+      join('src/uploads/' + firstName + lastName + '-signed.pdf'),
       pdfBytes,
     );
 
-    return firstName + lastName + email.replace('@', '') + '-merged.pdf';
+    return firstName + lastName + '-signed.pdf';
   }
 
   // Merge Signature
@@ -167,46 +161,50 @@ export class DocumentService {
         document.signature,
       );
       console.log('signatureImg', signatureImg);
+      console.log('document.doc', document.doc);
 
       const signaturePath = join(__dirname, '../../uploads/' + signatureImg);
       const dataPath = join(__dirname, '../../uploads/' + document.doc);
 
       let pdfSignature: PDFDocument, pdfFile: PDFDocument;
+      console.log('signaturePath', signaturePath);
+      console.log('dataPath', dataPath);
       try {
         pdfSignature = await PDFDocument.load(readFileSync(signaturePath));
         pdfFile = await PDFDocument.load(readFileSync(dataPath));
+        const copiedPagesA = await mergedPdf.copyPages(
+          pdfFile,
+          pdfFile.getPageIndices(),
+        );
+        copiedPagesA.forEach((page) => mergedPdf.addPage(page));
+
+        const copiedPagesB = await mergedPdf.copyPages(
+          pdfSignature,
+          pdfSignature.getPageIndices(),
+        );
+        copiedPagesB.forEach((page) => mergedPdf.addPage(page));
+
+        await mergedPdf.save();
+
+        const pdfBytes = await mergedPdf.save();
+        writeFileSync(
+          join(
+            'src/uploads/' + document.doc.replace('.pdf', '') + '-merged.pdf',
+          ),
+          pdfBytes,
+        );
+
+        await this.prisma.document.update({
+          where: { uuid },
+          data: {
+            signedDoc: document.doc.replace('.pdf', '') + '-merged.pdf',
+          },
+        });
+        return 'Successfully signed the document';
       } catch (fileReadError) {
         console.log(fileReadError);
         return this.error.ExcBadRequest('Failed to read PDF file');
       }
-
-      const copiedPagesA = await mergedPdf.copyPages(
-        pdfFile,
-        pdfFile.getPageIndices(),
-      );
-      copiedPagesA.forEach((page) => mergedPdf.addPage(page));
-
-      const copiedPagesB = await mergedPdf.copyPages(
-        pdfSignature,
-        pdfSignature.getPageIndices(),
-      );
-      copiedPagesB.forEach((page) => mergedPdf.addPage(page));
-
-      await mergedPdf.save();
-
-      const pdfBytes = await mergedPdf.save();
-      writeFileSync(
-        join('src/uploads/' + document.doc.replace('.pdf', '') + '-merged.pdf'),
-        pdfBytes,
-      );
-
-      await this.prisma.document.update({
-        where: { uuid },
-        data: {
-          signedDoc: document.doc.replace('.pdf', '') + '-merged.pdf',
-        },
-      });
-      return 'Successfully signed the document';
     } catch (error) {
       console.log(error);
       if (error.status === 400) {
