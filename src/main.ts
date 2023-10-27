@@ -25,7 +25,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
   app.useGlobalPipes(new ValidationPipe());
-  app.useStaticAssets(path.join(__dirname, '../uploads'));
+  app.useStaticAssets(path.join(__dirname, './uploads'));
+
+  app.enableCors({
+    origin: ['http://localhost:3000'],
+  });
   await app.listen(5500);
 }
 bootstrap();

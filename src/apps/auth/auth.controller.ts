@@ -1,4 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LoginDto, RegisterDto, isValidEmailDto } from './auth.dto';
 import { AuthService } from './auth.service';
@@ -40,5 +47,15 @@ export class AuthController {
   @ApiBody({ type: RegisterDto })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.registerUser(registerDto);
+  }
+
+  // Refresh Token
+  @Post('/refresh/:refresh_token')
+  @ApiResponse({
+    status: 200,
+    description: 'Refresh token',
+  })
+  async refresh(@Param('refresh_token') refresh_token: string) {
+    return this.authService.refresh(refresh_token);
   }
 }

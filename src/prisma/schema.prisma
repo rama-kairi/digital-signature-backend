@@ -39,9 +39,12 @@ model Document {
   deletedBy String?
   deletedAt DateTime?
 
-  name      String?
-  data      String?
-  signedPdf Bytes?
+  firstName String?
+  lastName  String?
+  email     String?
+  doc       String?
+  signature String?
+  signedDoc String?
   user      User?   @relation(fields: [userUuid], references: [uuid])
   userUuid  String?
 

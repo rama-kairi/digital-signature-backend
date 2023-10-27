@@ -5,11 +5,12 @@ import {
   validatePassword,
   verifyPassword,
 } from '@/common/utils/auth';
-import { generateJwt } from '@/common/utils/jwt';
+import { generateJwt, verifyJwt } from '@/common/utils/jwt';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'nestjs-prisma';
 import { LoginDto, RegisterDto, isValidEmailDto } from './auth.dto';
+import { config } from 'dotenv';
 
 @Injectable()
 export class AuthService {
@@ -17,7 +18,10 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly error: ErrorResService,
     private readonly success: SuccessResService,
-  ) {}
+  ) {
+    config({ path: process.cwd() + '/.env' });
+  }
+
   private readonly logger = new Logger(AuthService.name);
 
   /* Get User By Email */
@@ -99,5 +103,30 @@ export class AuthService {
       access_token,
       refresh_token,
     };
+  }
+
+  /* Refresh - Only Return new Access Token */
+  async refresh(refresh_token: string) {
+    try {
+      type Payload = {
+        sub: string;
+        type: string;
+        iat: number;
+        exp: number;
+      };
+
+      const jwtDecodeRes: Payload = await verifyJwt(refresh_token, {
+        secret: process.env.JWT_RT_SECRET,
+      });
+
+      const accessToken = await generateJwt(jwtDecodeRes.sub, 'access');
+
+      return {
+        access_token: accessToken,
+      };
+    } catch (e) {
+      this.logger.error(e);
+      return this.error.ExcUnauthorized('Unauthorized Invalid Token.');
+    }
   }
 }

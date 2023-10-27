@@ -1,3 +1,4 @@
+import { GetCurrentUserId } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
 import {
   Body,
@@ -48,8 +49,11 @@ export class DocumentController {
   })
   @ApiBody({ type: DocumentCreateDto })
   @ApiOperation({ summary: 'Create Document' })
-  async createDocument(@Body() data: DocumentCreateDto) {
-    return await this.documentService.createDocument(data);
+  async createDocument(
+    @Body() data: DocumentCreateDto,
+    @GetCurrentUserId() userId: string,
+  ) {
+    return await this.documentService.createDocument(data, userId);
   }
 
   // Get Document By uuid
@@ -92,13 +96,16 @@ export class DocumentController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads',
+        destination: './src/uploads',
         filename: (req, file, cb) => {
           const randomName = Array(32)
             .fill(null)
             .map(() => Math.round(Math.random() * 16).toString(16))
             .join('');
-          return cb(null, `${randomName}${file.originalname}`);
+          return cb(
+            null,
+            `${randomName}${file.originalname.replace(/\s/g, '')}`,
+          );
         },
       }),
     }),
@@ -111,15 +118,17 @@ export class DocumentController {
     return { msg: 'file uploaded', file, fileName: file.filename };
   }
 
-  // Add Signature
-  @Patch(':uuid/sign')
-  @UseInterceptors(FileInterceptor('signature'))
-  @ApiConsumes('multipart/form-data')
-  async signDocument(
-    @Param('uuid') uuid: string,
-    @Body() documentUploadDto: DocumentUploadDto,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    return this.documentService.signDocument(uuid, file.buffer);
+  // Merge Document
+  @Patch(':uuid/merge')
+  @ApiResponse({
+    status: 200,
+    description: 'Document Merge',
+  })
+  @ApiOperation({
+    summary: 'Document Merge',
+    description: '## Merge Document',
+  })
+  async signDocument(@Param('uuid') uuid: string) {
+    return this.documentService.signDocument(uuid);
   }
 }

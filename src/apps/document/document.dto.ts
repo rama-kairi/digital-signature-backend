@@ -1,28 +1,33 @@
 import { ApiProperty, PartialType, PickType } from '@nestjs/swagger';
 
-import { IsNotEmpty, IsUUID } from 'class-validator';
-
 class DocumentDto {
-  @IsUUID()
-  @ApiProperty({ type: String, format: 'uuid' })
-  userUuid: string;
-
-  @IsNotEmpty()
   @ApiProperty()
-  name: string;
+  firstName: string;
 
   @ApiProperty()
-  data: string;
+  lastName: string;
 
-  @ApiProperty({ type: Number, format: 'int32' })
-  signedPdf: number;
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty()
+  doc: string;
+
+  @ApiProperty()
+  signature: string;
+
+  @ApiProperty()
+  signedDoc: string;
 }
 
 //  Document Dto for create
 export class DocumentCreateDto extends PickType(DocumentDto, [
-  'userUuid',
-  'name',
-  'data',
+  'firstName',
+  'lastName',
+  'email',
+  'doc',
+  'signature',
+  'signedDoc',
 ]) {}
 
 // Document Dto for Update
