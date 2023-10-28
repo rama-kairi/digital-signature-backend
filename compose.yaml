@@ -17,9 +17,10 @@ services:
         - "443:443"
       volumes:
         - "./letsencrypt:/letsencrypt"
-        - "/var/run/docker.sock:/var/run/docker.sock" # Directly connecting to Docker socket
+        - "/var/run/docker.sock:/var/run/docker.sock"
       networks:
         - web
+
   server:
     build:
       context: .
@@ -35,6 +36,8 @@ services:
       - "traefik.http.routers.app.rule=Host(`opika-test-assesment.ownx.shop`)"
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls.certresolver=myresolver"
+      - "traefik.http.services.app.loadbalancer.server.port=YOUR_SERVER_PORT" # replace with your app's port
+      - "traefik.http.services.app.loadbalancer.server.scheme=http" # assuming it's HTTP
     depends_on:
       - postgres
     networks:
