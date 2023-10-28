@@ -19,7 +19,7 @@ services:
       JWT_RT_SECRET: 048a6782419259baf1b68805bb7da10c535f6d019efd3f6f5dad964e9e49addc
       JWT_RT_EXP: 12h
     ports:
-      - 8080:8080
+      - 80:8080
     depends_on:
       - postgres
 
