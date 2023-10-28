@@ -1,4 +1,25 @@
 services:
+  traefik:
+      image: traefik:latest
+      container_name: traefik
+      command:
+        - "--log.level=DEBUG"
+        - "--providers.docker=true"
+        - "--providers.docker.exposedbydefault=false"
+        - "--entrypoints.web.address=:80"
+        - "--entrypoints.websecure.address=:443"
+        - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+        - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+        - "--certificatesresolvers.myresolver.acme.email=siddharth@ownx.shop"
+        - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      ports:
+        - "80:80"
+        - "443:443"
+      volumes:
+        - "./letsencrypt:/letsencrypt"
+        - "/var/run/docker.sock:/var/run/docker.sock" # Directly connecting to Docker socket
+      networks:
+        - web
   server:
     build:
       context: .
@@ -11,8 +32,15 @@ services:
       JWT_AT_EXP: 60m
       JWT_RT_SECRET: 048a6782419259baf1b68805bb7da10c535f6d019efd3f6f5dad964e9e49addc
       JWT_RT_EXP: 12h
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`opika-test-assesment.ownx.shop`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=myresolver"
     depends_on:
       - postgres
+    networks:
+      - web
 
   postgres:
     image: postgres:15
@@ -24,6 +52,8 @@ services:
       - 5432:5432
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - web
 
 volumes:
   postgres-data:
