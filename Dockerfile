@@ -22,7 +22,7 @@ WORKDIR /usr/src/app
 # Leverage a cache mount to /root/.yarn to speed up subsequent builds.
 # Leverage bind mounts to package.json and yarn.lock to avoid having to copy them
 
-RUN npm install -g yarn
+RUN npm install -g yarn --force
 
 # into this layer.
 RUN --mount=type=bind,source=package.json,target=package.json \
