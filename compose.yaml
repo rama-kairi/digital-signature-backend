@@ -36,8 +36,8 @@ services:
       - "traefik.http.routers.app.rule=Host(`opika-test-assesment.ownx.shop`)"
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls.certresolver=myresolver"
-      - "traefik.http.services.app.loadbalancer.server.port=YOUR_SERVER_PORT" # replace with your app's port
-      - "traefik.http.services.app.loadbalancer.server.scheme=http" # assuming it's HTTP
+      - "traefik.http.services.app.loadbalancer.server.port=8080"
+      - "traefik.http.services.app.loadbalancer.server.scheme=http"
     depends_on:
       - postgres
     networks:

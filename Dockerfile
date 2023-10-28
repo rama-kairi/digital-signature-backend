@@ -38,6 +38,5 @@ RUN yarn prisma generate
 
 EXPOSE 8080
 
-
 # Run the start script.
 CMD ["yarn", "start:dev"]
