@@ -51,10 +51,6 @@ export class DocumentService {
   }
 
   async signDocument(data: DocumentCreateDto, file: Express.Multer.File) {
-    // create upload folder if not exist
-    const dir = join('./src/uploads');
-    if (!existsSync(dir)) mkdirSync(dir);
-
     // Create Signature PDF with FirstName, LastName, Email, Signature
     const signaturePDF = await PDFDocument.create();
     const page = signaturePDF.addPage();
@@ -90,19 +86,10 @@ export class DocumentService {
 
     const signaturePdfBytes = await signaturePDF.save();
 
-    // Assuming you want to temporarily save the signaturePDF
-    const tempSignaturePath = join(
-      __dirname,
-      '../../uploads/temp-signature.pdf',
-    );
-    writeFileSync(tempSignaturePath, signaturePdfBytes);
-
     // Merge Signature PDF with Document PDF
     const mergedPdf = await PDFDocument.create();
 
-    const pdfSignature = await PDFDocument.load(
-      readFileSync(tempSignaturePath),
-    );
+    const pdfSignature = await PDFDocument.load(signaturePdfBytes);
     const pdfFile = await PDFDocument.load(file.buffer);
 
     const copiedPagesA = await mergedPdf.copyPages(
@@ -118,16 +105,9 @@ export class DocumentService {
     copiedPagesB.forEach((page) => mergedPdf.addPage(page));
 
     const pdfBytes = await mergedPdf.save();
-    const mergedFilename =
-      new Date().toISOString().substring(10) + '-signed.pdf';
-    const outputPath = join('src/uploads/', mergedFilename);
-    writeFileSync(outputPath, pdfBytes);
 
-    // store the file in the database as base64
-    const base64Pdf = readFileSync(outputPath, { encoding: 'base64' });
-
-    // Clean up the temporary signature file
-    unlinkSync(tempSignaturePath);
+    // Convert the merged PDF to base64 without saving to filesystem
+    const base64Pdf = Buffer.from(pdfBytes).toString('base64');
 
     // Create the Document in the database
     const obj: Prisma.DocumentCreateInput = {
