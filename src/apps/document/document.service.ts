@@ -1,11 +1,17 @@
 import { ErrorResService } from '@/common/responses/error/error.service';
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { readFileSync, writeFileSync } from 'fs';
 import { PrismaService } from 'nestjs-prisma';
-import { join } from 'path';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { DocumentCreateDto } from './document.dto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import {
+  writeFileSync,
+  readFileSync,
+  unlinkSync,
+  existsSync,
+  mkdirSync,
+} from 'fs';
+import { join } from 'path';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class DocumentService {
@@ -28,103 +34,52 @@ export class DocumentService {
     }
   }
 
-  // Create Document
-  async createDocument(data: DocumentCreateDto, userId: string) {
-    try {
-      const obj: Prisma.DocumentCreateInput = {
-        createdBy: userId,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        doc: data.doc,
-        signature: data.signature,
-        user: {
-          connect: {
-            uuid: userId,
-          },
-        },
-      };
-
-      const document = await this.prisma.document.create({
-        data: obj,
-      });
-      return document;
-    } catch (error) {
-      return this.error.ExcBadRequest('Something bad happen, try again.');
-    }
-  }
-
-  // Get Document By uuid
-  async getDocumentByUuid(uuid: string) {
-    try {
-      const document = await this.prisma.document.findFirst({
-        where: { uuid },
-      });
-      return document;
-    } catch (error) {
-      return this.error.ExcBadRequest('Something bad happen, try again.');
-    }
-  }
-
-  // Update Document
-  async updateDocument(uuid: string, data: DocumentCreateDto) {
-    try {
-      const document = await this.prisma.document.update({
-        where: { uuid },
-        data,
-      });
-      return document;
-    } catch (error) {
-      console.log(error);
-      return this.error.ExcBadRequest(
-        'Something bad happen for update, try again.',
-      );
-    }
-  }
-
   // Delete Document
   async deleteDocument(uuid: string) {
     try {
-      const document = await this.prisma.document.delete({
-        where: { uuid },
+      const deleteDocument = await this.prisma.document.delete({
+        where: {
+          uuid,
+        },
       });
-      return document;
+      return deleteDocument;
     } catch (error) {
+      console.log(error.message);
+
       return this.error.ExcBadRequest('Something bad happen, try again.');
     }
   }
 
-  // Add Signature
-  async createSignaturePDF(
-    firstName: string,
-    lastName: string,
-    email: string,
-    signatureBase64: string,
-  ) {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage();
-    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  async signDocument(data: DocumentCreateDto, file: Express.Multer.File) {
+    // create upload folder if not exist
+    const dir = join('./src/uploads');
+    if (!existsSync(dir)) mkdirSync(dir);
 
-    page.drawText(`First Name: ${firstName}`, {
+    // Create Signature PDF with FirstName, LastName, Email, Signature
+    const signaturePDF = await PDFDocument.create();
+    const page = signaturePDF.addPage();
+    const helveticaFont = await signaturePDF.embedFont(StandardFonts.Helvetica);
+
+    page.drawText(`First Name: ${data.firstName}`, {
       x: 50,
       y: page.getHeight() - 70,
       size: 20,
       font: helveticaFont,
     });
-    page.drawText(`Last Name: ${lastName}`, {
+    page.drawText(`Last Name: ${data.lastName}`, {
       x: 50,
       y: page.getHeight() - 100,
       size: 20,
       font: helveticaFont,
     });
-    page.drawText(`Email: ${email}`, {
+    page.drawText(`Email: ${data.email}`, {
       x: 50,
       y: page.getHeight() - 130,
       size: 20,
       font: helveticaFont,
     });
 
-    const signatureImage = await pdfDoc.embedPng(signatureBase64);
+    const signatureImage = await signaturePDF.embedPng(data.signature);
     const signatureDims = signatureImage.scale(1);
     page.drawImage(signatureImage, {
       x: page.getWidth() / 2 - signatureDims.width / 2,
@@ -133,84 +88,88 @@ export class DocumentService {
       height: signatureDims.height,
     });
 
-    const pdfBytes = await pdfDoc.save();
-    writeFileSync(
-      join('src/uploads/' + firstName + lastName + '-signed.pdf'),
-      pdfBytes,
-    );
+    const signaturePdfBytes = await signaturePDF.save();
 
-    return firstName + lastName + '-signed.pdf';
+    // Assuming you want to temporarily save the signaturePDF
+    const tempSignaturePath = join(
+      __dirname,
+      '../../uploads/temp-signature.pdf',
+    );
+    writeFileSync(tempSignaturePath, signaturePdfBytes);
+
+    // Merge Signature PDF with Document PDF
+    const mergedPdf = await PDFDocument.create();
+
+    const pdfSignature = await PDFDocument.load(
+      readFileSync(tempSignaturePath),
+    );
+    const pdfFile = await PDFDocument.load(file.buffer);
+
+    const copiedPagesA = await mergedPdf.copyPages(
+      pdfFile,
+      pdfFile.getPageIndices(),
+    );
+    copiedPagesA.forEach((page) => mergedPdf.addPage(page));
+
+    const copiedPagesB = await mergedPdf.copyPages(
+      pdfSignature,
+      pdfSignature.getPageIndices(),
+    );
+    copiedPagesB.forEach((page) => mergedPdf.addPage(page));
+
+    const pdfBytes = await mergedPdf.save();
+    const mergedFilename =
+      new Date().toISOString().substring(10) + '-signed.pdf';
+    const outputPath = join('src/uploads/', mergedFilename);
+    writeFileSync(outputPath, pdfBytes);
+
+    // store the file in the database as base64
+    const base64Pdf = readFileSync(outputPath, { encoding: 'base64' });
+
+    // Clean up the temporary signature file
+    unlinkSync(tempSignaturePath);
+
+    // Create the Document in the database
+    const obj: Prisma.DocumentCreateInput = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      doc: file.originalname,
+      signature: data.signature,
+      signedDoc: base64Pdf,
+    };
+
+    try {
+      await this.prisma.document.create({
+        data: obj,
+      });
+    } catch (error) {
+      return this.error.ExcBadRequest('Something bad happen, try again.');
+    }
+
+    return { success: true, message: 'Document Signed Successfully' };
   }
 
-  // Merge Signature
-  async signDocument(uuid: string) {
+  // Download pdf file from database
+  async downloadDocument(uuid: string) {
     try {
       const document = await this.prisma.document.findUnique({
-        where: { uuid },
+        where: {
+          uuid,
+        },
       });
+
       if (!document) {
-        return this.error.ExcBadRequest('Document not found');
+        return this.error.ExcBadRequest('Document not found.');
       }
 
-      const mergedPdf = await PDFDocument.create();
+      const pdfBase64 = document.signedDoc;
 
-      const signatureImg = await this.createSignaturePDF(
-        document.firstName,
-        document.lastName,
-        document.email,
-        document.signature,
-      );
-      console.log('signatureImg', signatureImg);
-      console.log('document.doc', document.doc);
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
-      const signaturePath = join(__dirname, '../../uploads/' + signatureImg);
-      const dataPath = join(__dirname, '../../uploads/' + document.doc);
-
-      let pdfSignature: PDFDocument, pdfFile: PDFDocument;
-      console.log('signaturePath', signaturePath);
-      console.log('dataPath', dataPath);
-      try {
-        pdfSignature = await PDFDocument.load(readFileSync(signaturePath));
-        pdfFile = await PDFDocument.load(readFileSync(dataPath));
-        const copiedPagesA = await mergedPdf.copyPages(
-          pdfFile,
-          pdfFile.getPageIndices(),
-        );
-        copiedPagesA.forEach((page) => mergedPdf.addPage(page));
-
-        const copiedPagesB = await mergedPdf.copyPages(
-          pdfSignature,
-          pdfSignature.getPageIndices(),
-        );
-        copiedPagesB.forEach((page) => mergedPdf.addPage(page));
-
-        await mergedPdf.save();
-
-        const pdfBytes = await mergedPdf.save();
-        writeFileSync(
-          join(
-            'src/uploads/' + document.doc.replace('.pdf', '') + '-merged.pdf',
-          ),
-          pdfBytes,
-        );
-
-        await this.prisma.document.update({
-          where: { uuid },
-          data: {
-            signedDoc: document.doc.replace('.pdf', '') + '-merged.pdf',
-          },
-        });
-        return 'Successfully signed the document';
-      } catch (fileReadError) {
-        console.log(fileReadError);
-        return this.error.ExcBadRequest('Failed to read PDF file');
-      }
+      return pdfBuffer;
     } catch (error) {
-      console.log(error);
-      if (error.status === 400) {
-        return this.error.ExcBadRequest(error.response.msg);
-      }
-      return this.error.ExcBadRequest('Something bad happened, try again.');
+      return this.error.ExcBadRequest('Something bad happen, try again.');
     }
   }
 }

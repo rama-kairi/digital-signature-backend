@@ -1,37 +1,24 @@
-import { ApiProperty, PartialType, PickType } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
-class DocumentDto {
-  @ApiProperty()
+export class DocumentCreateDto {
+  @ApiProperty({ required: false })
   firstName: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   lastName: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   email: string;
 
-  @ApiProperty()
+  @ApiProperty({ type: 'string', format: 'binary', required: false })
   doc: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   signature: string;
-
-  @ApiProperty()
-  signedDoc: string;
 }
 
-//  Document Dto for create
-export class DocumentCreateDto extends PickType(DocumentDto, [
-  'firstName',
-  'lastName',
-  'email',
-  'doc',
-  'signature',
-  'signedDoc',
-]) {}
-
 // Document Dto for Update
-export class DocumentUpdateDto extends PartialType(DocumentCreateDto) {}
+// export class DocumentUpdateDto extends PartialType(DocumentCreateDto) {}
 
 // Document Dto for Upload
 export class DocumentUploadDto {

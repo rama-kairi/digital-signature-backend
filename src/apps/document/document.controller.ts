@@ -1,28 +1,26 @@
-import { GetCurrentUserId } from '@/common/decorators';
 import { JwtAuthGuard } from '@/common/guards';
 import {
   Body,
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
-  Patch,
   Post,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
-  ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { diskStorage } from 'multer';
-import { DocumentCreateDto, DocumentUploadDto } from './document.dto';
+import { DocumentCreateDto } from './document.dto';
 import { DocumentService } from './document.service';
 
 @Controller('document')
@@ -32,7 +30,7 @@ import { DocumentService } from './document.service';
 export class DocumentController {
   constructor(private readonly documentService: DocumentService) {}
 
-  // Get All Documents
+  // // Get All Documents
   @Get()
   @ApiResponse({ status: 200, description: 'Document' })
   @ApiOperation({ summary: 'Get Document List' })
@@ -40,91 +38,47 @@ export class DocumentController {
     return await this.documentService.getAllDocuments();
   }
 
-  // Create Document
-  @Post()
-  @ApiResponse({
-    status: 201,
-    description: 'Document',
-    type: DocumentCreateDto,
-  })
-  @ApiBody({ type: DocumentCreateDto })
-  @ApiOperation({ summary: 'Create Document' })
-  async createDocument(
-    @Body() data: DocumentCreateDto,
-    @GetCurrentUserId() userId: string,
+  @Post('/sign_document')
+  @UseInterceptors(FileInterceptor('doc'))
+  @ApiConsumes('multipart/form-data')
+  async uploadFile(
+    @UploadedFile() doc: Express.Multer.File,
+    @Body() body: DocumentCreateDto,
+    // @Res() res,
   ) {
-    return await this.documentService.createDocument(data, userId);
-  }
+    const data = await this.documentService.signDocument(body, doc);
 
-  // Get Document By uuid
-  @Get('/:uuid')
-  @ApiResponse({ status: 200, description: 'Document' })
-  @ApiOperation({ summary: 'Get Document By uuid' })
-  async getDocumentByUuid(@Param('uuid') uuid: string) {
-    return await this.documentService.getDocumentByUuid(uuid);
-  }
-
-  // Update Document
-  @Patch('/:uuid')
-  @ApiResponse({ status: 200, description: 'Document' })
-  @ApiOperation({ summary: 'Update Document' })
-  async updateDocument(
-    @Param('uuid') uuid: string,
-    @Body() data: DocumentCreateDto,
-  ) {
-    return await this.documentService.updateDocument(uuid, data);
+    // res.setHeader('Content-Type', 'application/pdf');
+    // res.sendFile(data.filename, { root: 'dist/uploads' });
+    return data;
   }
 
   // Delete Document
-  @Delete('/:uuid')
-  @ApiResponse({ status: 200, description: 'Document' })
+  @Delete('/delete_document/:id')
   @ApiOperation({ summary: 'Delete Document' })
-  async deleteDocument(@Param('uuid') uuid: string) {
-    return await this.documentService.deleteDocument(uuid);
+  async deleteDocument(@Param('id') id: string) {
+    try {
+      return await this.documentService.deleteDocument(id);
+    } catch (error) {
+      throw new HttpException(error, 400);
+    }
   }
 
-  // Upload Document
-  @Patch('upload/file')
-  @ApiResponse({
-    status: 200,
-    description: 'Document upload',
-  })
-  @ApiOperation({
-    summary: 'Document upload',
-    description: '## Upload Document',
-  })
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './src/uploads',
-        filename: (req, file, cb) => {
-          return cb(
-            null,
-            `${new Date().getTime()}${file.originalname.replace(/\s/g, '')}`,
-          );
-        },
-      }),
-    }),
-  )
-  @ApiConsumes('multipart/form-data')
-  async uploadDocument(
-    @Body() documentUploadDto: DocumentUploadDto,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    return { msg: 'file uploaded', file, fileName: file.filename };
-  }
-
-  // Merge Document
-  @Patch(':uuid/merge')
-  @ApiResponse({
-    status: 200,
-    description: 'Document Merge',
-  })
-  @ApiOperation({
-    summary: 'Document Merge',
-    description: '## Merge Document',
-  })
-  async signDocument(@Param('uuid') uuid: string) {
-    return this.documentService.signDocument(uuid);
+  @Get('/download_document/:id')
+  @ApiOperation({ summary: 'Download Document' })
+  async downloadDocument(@Param('id') id: string, @Res() res) {
+    try {
+      const data = await this.documentService.downloadDocument(id);
+      console.log('data', data);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=signed_document.pdf`,
+      );
+      res.send(data);
+    } catch (error) {
+      console.log(error.message);
+      throw new HttpException(error, 400);
+    }
   }
 }

@@ -11,17 +11,9 @@ import { PrismaModule } from 'nestjs-prisma';
       prismaServiceOptions: {
         middlewares: [
           async (params, next) => {
-            // Before query: change params
-            // console.log(params);
-
             const result = await next(params);
-            // After query: result
             return result;
           },
-          // readMiddleware(),
-          // softDeleteMiddleware(),
-          // toAsciiMiddleware(),
-          // loggingMiddleware(),
         ], // see example loggingMiddleware below
         prismaOptions: {
           log: [

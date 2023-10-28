@@ -6,7 +6,7 @@ import {
   verifyPassword,
 } from '@/common/utils/auth';
 import { generateJwt, verifyJwt } from '@/common/utils/jwt';
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'nestjs-prisma';
 import { LoginDto, RegisterDto, isValidEmailDto } from './auth.dto';
@@ -33,9 +33,9 @@ export class AuthService {
     } catch (e) {
       this.logger.error(e);
       if (e.code === 'P2025') {
-        return this.error.ExcBadRequest('User not found');
+        throw new Error('User not found');
       }
-      return this.error.ExcBadRequest('Something bad happen, try again.');
+      throw new Error(e.message);
     }
   }
 
@@ -47,9 +47,7 @@ export class AuthService {
       });
       return user && true;
     } catch (e) {
-      return this.error.ExcNotFound(
-        `User not found with the Email ${email.email}`,
-      );
+      throw new Error(e.message);
     }
   }
 
@@ -61,6 +59,7 @@ export class AuthService {
         return this.error.ExcBadRequest('Password does not match');
       }
       const ps = validatePassword(registerDto.password);
+      console.log(ps);
       if (!ps.isOk) {
         return this.error.ExcBadRequest(ps.msg);
       }
@@ -90,11 +89,11 @@ export class AuthService {
     const { email, password } = loginDto;
 
     const user = await this.getUserByEmail(email);
-    if (!user) this.error.ExcUnauthorized('invalid credentials!');
+    if (!user) return this.error.ExcBadRequest('Invalid Email');
 
     // Compare Plain and Hash Password
     const isOk = await verifyPassword(user.password, password);
-    if (!isOk) this.error.ExcUnauthorized('invalid credentials!');
+    if (!isOk) return this.error.ExcBadRequest('Invalid Password');
     const access_token = await generateJwt(user.uuid, 'access');
     const refresh_token = await generateJwt(user.uuid, 'refresh');
 
@@ -125,8 +124,8 @@ export class AuthService {
         access_token: accessToken,
       };
     } catch (e) {
-      this.logger.error(e);
-      return this.error.ExcUnauthorized('Unauthorized Invalid Token.');
+      this.logger.error(e.message);
+      return this.error.ExcBadRequest(e.message);
     }
   }
 }

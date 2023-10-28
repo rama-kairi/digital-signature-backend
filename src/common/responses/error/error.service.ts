@@ -14,7 +14,7 @@ type HttpErrorStatusType =
 @Injectable()
 export class ErrorResService {
   HttpExe = (msg: string, status: HttpErrorStatusType) => {
-    throw new HttpException(
+    return new HttpException(
       {
         status: Number(status),
         msg,

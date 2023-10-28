@@ -27,7 +27,7 @@ interface IPasswordValidation {
 
 // Password Validator
 export const validatePassword = (password: string): IPasswordValidation => {
-  if (password.length < 12) {
+  if (password.length < 6) {
     return passwordReturn(
       false,
       'Password length must be greater than 12 character.',

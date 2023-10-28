@@ -37,7 +37,6 @@ export const generateJwt = async (uuid: string, type: tokenType) => {
     sub: uuid,
     type: type,
   };
-  // console.log('test ', typeof jwtCred[type].exp);
   return await js.signAsync(jwtPayload, {
     secret: jwtCred[type].secret,
     expiresIn: jwtCred[type].exp,
